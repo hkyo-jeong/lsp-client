@@ -1,12 +1,13 @@
 import * as cp from 'child_process';
-import { DocumentUri } from 'vscode-languageserver-types';
-import { InitializeParams } from 'vscode-languageserver-protocol';
+import { DocumentUri, Position, TextDocumentIdentifier } from 'vscode-languageserver-types';
+import { InitializeParams, DocumentSymbolParams, DocumentSymbolRequest, DefinitionRequest, DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DefinitionParams, DidChangeWatchedFilesParams } from 'vscode-languageserver-protocol';
 import * as util from 'util';
 import * as fs from 'fs';
+import * as path from 'path';
 
 
-const childProcess = cp.spawn('tsx', ['test-server.ts', '--stdio']);
-// const childProcess = cp.spawn('node', ['/Users/hkyo/hkyo_config/codes/pyright/packages/pyright/dist/pyright-langserver.js', '--stdio']);
+// const childProcess = cp.spawn('tsx', ['test-server.ts', '--stdio']);
+const childProcess = cp.spawn('node', ['/Users/hkyo/hkyo_config/codes/pyright/packages/pyright/dist/pyright-langserver.js', '--stdio']);
 
 let cachedBuffer: Buffer = Buffer.alloc(0);
 let jsonrpcLength = 0;
@@ -83,12 +84,35 @@ childProcess.stdout.on('data', (data: Buffer) => {
 // 	console.log(`stderr : ${data.toString('utf8')}`);
 // });
 
+function toFileUri(absolutePath:string) {
+	return `file://${absolutePath}`;
+}
+
 //#########################################################################################################################################
 
+import { watch, FSWatcher } from 'chokidar';
 
+function run_watcher(dirpath:string) {
+	const watcher: FSWatcher = watch(dirpath, {
+		persistent: true,
+		ignoreInitial: true,
+	});
+
+
+	const watchedFilesParam: DidChangeWatchedFilesParams = {
+		changes: []
+	};
+
+	watcher
+	.on('add', (path:string) => console.log(`File ${path} has been added`))
+	.on('change', (path:string) => console.log(`File ${path} has been changed`))
+	.on('unlink', (path:string) => console.log(`File ${path} has been removed`));
+}
+
+
+//#########################################################################################################################################
 
 import * as rpc from 'vscode-jsonrpc/node';
-import { DidOpenTextDocumentNotification, DidOpenTextDocumentParams} from 'vscode-languageserver-protocol';
 // import { BaseLanguageClient, MessageTransports } from 'vscode-languageclient';
 
 // class LanguageClient extends BaseLanguageClient {
@@ -101,8 +125,11 @@ import { DidOpenTextDocumentNotification, DidOpenTextDocumentParams} from 'vscod
 
 // }
 
-const rootUri: DocumentUri = "file:///Users/hkyo/hkyo_config/codes/python";
-const fileUri: DocumentUri = "file:///Users/hkyo/hkyo_config/codes/python/test.py";
+const rootPath = "/Users/hkyo/hkyo_config/codes/python";
+const rootUri: DocumentUri = toFileUri(rootPath);
+const fileUri: DocumentUri = toFileUri(path.join(rootPath, 'test.py'));
+const file2Uri: DocumentUri = toFileUri(path.join(rootPath, 'test2.py'));
+
 
 const initializeParam: InitializeParams = {
 	rootUri: rootUri,
@@ -111,14 +138,7 @@ const initializeParam: InitializeParams = {
 	trace: "verbose"
 };
 
-const didOpenRequest:DidOpenTextDocumentParams = {
-	textDocument: {
-		uri: fileUri,
-		languageId: 'python',
-		version: 0,
-		text: fs.readFileSync('/Users/hkyo/hkyo_config/codes/python/test.py').toString()
-	}
-}; 
+run_watcher(rootPath);
 
 const connection = rpc.createMessageConnection(
 	new rpc.StreamMessageReader(childProcess.stdout),
@@ -143,9 +163,61 @@ connection.sendRequest('initialize', initializeParam);
 connection.sendNotification('initialized');
 
 setTimeout(() => {
+	const didOpenRequest:DidOpenTextDocumentParams = {
+		textDocument: {
+			// uri: fileUri,
+			uri: file2Uri,
+			languageId: 'python',
+			version: 0,
+			// text: fs.readFileSync(filePath).toString()
+			text:`import test1
+
+c3 = test1.test_function()
+print(c3)`
+		}
+	}; 
+
+	console.log('----- did open text document ----');
+	console.log('* send did open text document');
 	connection.sendNotification(DidOpenTextDocumentNotification.method, didOpenRequest);
-	// connection.sendRequest('custom/call');
 }, (2000));
+
+
+
+
+setTimeout(() => {
+	const documentSymbolParam:DocumentSymbolParams = {
+		textDocument: TextDocumentIdentifier.create(fileUri)
+	};
+
+	console.log('----- document symbol ----');
+	console.log('* send document symbol');
+	connection.sendRequest(DocumentSymbolRequest.method, documentSymbolParam);
+}, (4000));
+
+
+
+
+// setTimeout(() => {
+// 	const definitionRequest:DefinitionParams = {
+// 		// textDocument: TextDocumentIdentifier.create(fileUri),
+// 		// position: Position.create(50, 12)
+		
+// 		textDocument: TextDocumentIdentifier.create(fileUri),
+// 		position: Position.create(51, 0)
+		
+		
+// 		// textDocument: TextDocumentIdentifier.create(file2Uri),
+// 		// position: Position.create(2, 12)
+// 	};
+
+// 	console.log('----- definition request ----');
+// 	console.log('* send definition request');
+// 	connection.sendRequest(DefinitionRequest.method, definitionRequest);
+// }, (4000));
+
+
+
 
 // connection.onRequest('message', (data) => {
 // 	console.log('-- message --');
