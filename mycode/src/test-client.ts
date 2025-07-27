@@ -1,13 +1,14 @@
 import * as cp from 'child_process';
 import { DocumentUri, Position, TextDocumentIdentifier } from 'vscode-languageserver-types';
-import { InitializeParams, DocumentSymbolParams, DocumentSymbolRequest, DefinitionRequest, DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DefinitionParams, DidChangeWatchedFilesParams } from 'vscode-languageserver-protocol';
+import { InitializeParams, InitializedNotification, DocumentSymbolParams, DocumentSymbolRequest, DefinitionRequest, DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DefinitionParams, DidChangeWatchedFilesParams, InitializeRequest } from 'vscode-languageserver-protocol';
 import * as util from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const langServerPath = '/Users/hkyo/hkyo_config/codes/pyright/packages/pyright/dist/pyright-langserver.js';
 
 // const childProcess = cp.spawn('tsx', ['test-server.ts', '--stdio']);
-const childProcess = cp.spawn('node', ['/Users/hkyo/hkyo_config/codes/pyright/packages/pyright/dist/pyright-langserver.js', '--stdio']);
+const childProcess = cp.spawn('node', [langServerPath, '--stdio']);
 
 let cachedBuffer: Buffer = Buffer.alloc(0);
 let jsonrpcLength = 0;
@@ -60,11 +61,7 @@ childProcess.stdout.on('data', (data: Buffer) => {
 
 	console.log('-----------------------------------------');
 
-	while(1) {
-		if(cachedBuffer.length < 16) {
-			break;
-		}
-
+	while(cachedBuffer.length >= 16) {
 		if (messageLength == 0) {
 			parseJsonRpcHeader(cachedBuffer);
 		}
@@ -142,7 +139,8 @@ run_watcher(rootPath);
 
 const connection = rpc.createMessageConnection(
 	new rpc.StreamMessageReader(childProcess.stdout),
-	new rpc.StreamMessageWriter(childProcess.stdin));
+	new rpc.StreamMessageWriter(childProcess.stdin)
+);
 
 // const notification = new rpc.NotificationType<string>('testNotification');
 
@@ -158,9 +156,9 @@ connection.listen();
 console.log('-- initialize param --');
 console.log(initializeParam);
 
-connection.sendRequest('initialize', initializeParam);
+connection.sendRequest(InitializeRequest.method, initializeParam);
 
-connection.sendNotification('initialized');
+connection.sendNotification(InitializedNotification.method);
 
 setTimeout(() => {
 	const didOpenRequest:DidOpenTextDocumentParams = {
