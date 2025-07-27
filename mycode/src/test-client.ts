@@ -129,6 +129,7 @@ const file2Uri: DocumentUri = toFileUri(path.join(rootPath, 'test2.py'));
 
 
 const initializeParam: InitializeParams = {
+	processId: process.pid,
 	rootUri: rootUri,
 	rootPath: '/Users/hkyo/hkyo_config/codes/python',
 	capabilities: {},
