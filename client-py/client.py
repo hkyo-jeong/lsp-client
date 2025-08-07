@@ -9,8 +9,11 @@ from pylsp_jsonrpc.endpoint import Endpoint
 from pylsp_jsonrpc import dispatchers
 from language_util import LanguageRegistry
 
-root_path = '/Users/hkyo/hkyo_config/codes/python'
-language_id = 'python'
+# root_path = '/Users/hkyo/hkyo_config/codes/python'
+# language_id = 'python'
+
+root_path = '/Users/hkyo/hkyo_config/codes/c++'
+language_id = 'cpp'
 
 class NotSupportedLanguageServer(Exception):
 	pass
@@ -178,6 +181,43 @@ class LSPServerPython(AbstractLSPServer):
 	
 	def get_cmd_args(self):
 		return ['pyright-langserver', '--stdio']
+	
+class LSPServerCpp(AbstractLSPServer):
+	reader: JsonRpcStreamReader
+	writer: JsonRpcStreamWriter
+	exts = ['cpp', 'c', 'h', 'hpp', 'cc']
+
+	def __init__(self, root_path):
+		super().__init__()
+
+		self.root_path = root_path
+
+	def start(self):
+		self.server_proc = subprocess.Popen(
+			self.get_cmd_args(),
+			stdin=subprocess.PIPE,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			bufsize=0
+		)
+
+		self.reader = JsonRpcStreamReader(self.server_proc.stdout)
+		self.writer = JsonRpcStreamWriter(self.server_proc.stdin, sort_keys=True)
+
+	def stop(self):
+		self.server_proc.kill()
+
+	def get_streams(self):
+		return (self.reader, self.writer)
+	
+	def is_started(self):
+		return True
+	
+	def get_exts(self):
+		return self.exts
+	
+	def get_cmd_args(self):
+		return ['clangd']
 
 
 class LSPServerRunner:
@@ -188,7 +228,7 @@ class LSPServerRunner:
 		elif language_id == 'typescript':
 			pass
 		elif language_id in ['cpp', 'c']:
-			pass
+			return LSPServerCpp(root_path)
 		else:
 			raise NotSupportedLanguageServer(f'{language_id} is not supported language server yet')
 
